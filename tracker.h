@@ -1,0 +1,49 @@
+#ifndef TRACKER_H
+#define TRACKER_H
+
+#include <iostream>
+#include <vector>
+#include <string>
+#include <openssl/sha.h>
+#include <boost/asio.hpp>
+#include <boost/beast.hpp>
+#include "torrent.h"
+#include "seeder.h"
+#include <sqlite3.h>
+#include "http_session.h"
+
+namespace asio = boost::asio;
+namespace beast = boost::beast;
+using tcp = asio::ip::tcp;
+
+class Tracker {
+public:
+    std::vector<std::string> seeder_ips;
+    std::string ip;
+    std::vector<std::string> peer_ips;
+    TorrentFile torrent_file;
+    asio::io_context io_context;
+     asio::ip::tcp::acceptor acceptor;
+
+     sqlite3* db;
+    
+
+    Tracker();
+    void start_accept();
+    void add_seeder(const std::string& seeder_ip);
+    void add_peer(const std::string& peer_ip);
+    void list_seeders(const std::string &client_ip, const std::string &port);
+    TorrentFile get_torrent_file() const;
+    std::string select_file(const std::string &name);
+    void peer_choosed_file(const std::string &name);
+    void show_available_files(sqlite3 *db, std::stringstream &response_body) const;
+    void delete_file(const std::string &name);
+    void add_file(const std::string &name, const std::string &path);
+
+};
+
+bool openDatabase(const std::string& dbName, sqlite3** db);
+void closeDatabase(sqlite3* db);
+void if_db_not_created(sqlite3* db);
+
+#endif // TRACKER_H
