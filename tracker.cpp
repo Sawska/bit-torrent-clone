@@ -28,6 +28,27 @@ void Tracker::add_peer(const std::string& peer_ip) {
     std::cout << "Peer added: " << peer_ip << std::endl;
 }
 
+void Tracker::remove_seeder(const std::string &seeder_ip) {
+    auto it = std::find(seeder_ips.begin(), seeder_ips.end(), seeder_ip);
+    if (it != seeder_ips.end()) {
+        seeder_ips.erase(it);
+        std::cout << "Seeder removed: " << seeder_ip << std::endl;
+    } else {
+        std::cerr << "Seeder not found: " << seeder_ip << std::endl;
+    }
+}
+
+void Tracker::remove_peer(const std::string &peer_ip)
+{
+    auto it = std::find(peer_ips.begin(),peer_ips.end(),peer_ip);
+    if (it != peer_ips.end()) {
+        peer_ips.erase(it);
+        std::cout << "Peer removed:" << peer_ip << std::endl;
+    } else {
+        std::cerr <<  "Peer not found" << peer_ip << std::endl;
+    }
+}
+
 void Tracker::list_seeders(const std::string& client_ip, const std::string& port) {
     std::cout << "Handling list seeders request from IP: " << client_ip << std::endl;
 
@@ -96,7 +117,7 @@ std::string Tracker::select_file( const std::string &name) {
 }
 
 void Tracker::peer_choosed_file(const std::string& name) {
-    std::string path = select_file(db, name);
+    std::string path = select_file(name);
 
     if (!path.empty()) {
         torrent_file.create_torrent_file(path, 5); 
@@ -105,7 +126,7 @@ void Tracker::peer_choosed_file(const std::string& name) {
     }
 }
 
-void Tracker::show_available_files(sqlite3* db, std::stringstream& response_body) const {
+void Tracker::show_available_files( std::stringstream& response_body) const {
     std::string sql = "SELECT name FROM files";
     sqlite3_stmt *stmt = nullptr;
 

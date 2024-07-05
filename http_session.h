@@ -25,6 +25,10 @@ private:
     void handle_send_torrent_file();
     void handle_send_available_files();
     void send_response(http::status status, const std::string& body);
+    void handle_become_seeder();
+    void handle_become_peer();
+    void handle_unbecome_seeder();
+    void handle_unbecome_peer();
 
     asio::ip::tcp::socket socket;
     beast::flat_buffer buffer;

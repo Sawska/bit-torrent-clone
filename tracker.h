@@ -32,11 +32,13 @@ public:
     void start_accept();
     void add_seeder(const std::string& seeder_ip);
     void add_peer(const std::string& peer_ip);
+    void remove_seeder(const std::string& seeder_ip);
+    void remove_peer(const std::string& peer_ip);
     void list_seeders(const std::string &client_ip, const std::string &port);
     TorrentFile get_torrent_file() const;
     std::string select_file(const std::string &name);
     void peer_choosed_file(const std::string &name);
-    void show_available_files(sqlite3 *db, std::stringstream &response_body) const;
+    void show_available_files(std::stringstream &response_body) const;
     void delete_file(const std::string &name);
     void add_file(const std::string &name, const std::string &path);
 
