@@ -21,82 +21,31 @@ void http_session::read_request() {
 
 void http_session::handle_request() {
     std::string target = std::string(request.target());
+
+    if (request.method() != http::verb::post) {
+        send_response(http::status::method_not_allowed, "Method not allowed");
+        return;
+    }
+
     if (target == "/list_seeders") {
         handle_list_seeders();
-    }  else if (target == "/")
-    {
-        handle_become_peer();
-    }
-    else if (target == "/send_torrent_file") {
+    } else if (target == "/send_torrent_file") {
         handle_send_torrent_file();
     } else if (target == "/available_files") {
         handle_send_available_files();
     } else if (target == "/choosed_file") {
         handle_choosed_file();
-    } else if (target == "/become_seeder")
-    {
+    } else if (target == "/become_seeder") {
         handle_become_seeder();
-    } else if (target == "/become_peer")
-    {
+    } else if (target == "/become_peer") {
         handle_become_peer();
-    }  else if (target == "/unbecome_seeder")
-    {
+    } else if (target == "/unbecome_seeder") {
         handle_unbecome_seeder();
-    } else if (target == "/unbecome_peer")
-    {
+    } else if (target == "/unbecome_peer") {
         handle_unbecome_peer();
-    }
-    else {
+    } else {
         send_response(http::status::not_found, "Not Found");
     }
-}
-
-
-
-void http_session::handle_become_peer() {
-    std::string ip = request.body();
-
-    tracker.add_peer(ip);
-
-    send_response(http::status::ok,"Added your ip" + ip + "to peers");
-}
-
-void http_session::handle_unbecome_seeder()
-{
-    std::string ip = request.body();
-
-    tracker.remove_seeder(ip);
-
-    send_response(http::status::ok,"Removed your ip " + ip + "from seeders");
-}
-
-void http_session::handle_unbecome_peer()
-{
-    std::string ip = request.body();
-
-    tracker.remove_peer(ip);
-
-    send_response(http::status::ok, "Removed your ip " + ip + "froom peers");
-}
-
-void http_session::handle_become_seeder() {
-    std::string ip = request.body();
-
-    tracker.add_seeder(ip);
-
-    send_response(http::status::ok, "Added your ip " + ip + "to seeders");
-}
-
-
-void http_session::handle_choosed_file() {
-    
-    std::string file_name = request.body();
-
-    
-    tracker.peer_choosed_file( file_name);
-
-    
-    send_response(http::status::ok, "File chosen successfully: " + file_name);
 }
 
 void http_session::handle_list_seeders() {
@@ -109,10 +58,7 @@ void http_session::handle_list_seeders() {
 
 void http_session::handle_send_torrent_file() {
     TorrentFile torrent = tracker.get_torrent_file();
-    
-    
     std::string serialized_torrent = torrent.serialize_to_json();
-    
     send_response(http::status::ok, serialized_torrent);
 }
 
@@ -120,8 +66,37 @@ void http_session::handle_send_available_files() {
     std::stringstream response_body;
     response_body << "Available Files:\n";
     tracker.show_available_files(response_body);
-    
     send_response(http::status::ok, response_body.str());
+}
+
+void http_session::handle_choosed_file() {
+    std::string file_name = request.body();
+    tracker.peer_choosed_file(file_name);
+    send_response(http::status::ok, "File chosen successfully: " + file_name);
+}
+
+void http_session::handle_become_seeder() {
+    std::string ip = request.body();
+    tracker.add_seeder(ip);
+    send_response(http::status::ok, "Added your ip " + ip + " to seeders");
+}
+
+void http_session::handle_become_peer() {
+    std::string ip = request.body();
+    tracker.add_peer(ip);
+    send_response(http::status::ok, "Added your ip " + ip + " to peers");
+}
+
+void http_session::handle_unbecome_seeder() {
+    std::string ip = request.body();
+    tracker.remove_seeder(ip);
+    send_response(http::status::ok, "Removed your ip " + ip + " from seeders");
+}
+
+void http_session::handle_unbecome_peer() {
+    std::string ip = request.body();
+    tracker.remove_peer(ip);
+    send_response(http::status::ok, "Removed your ip " + ip + " from peers");
 }
 
 void http_session::send_response(http::status status, const std::string& body) {

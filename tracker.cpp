@@ -2,13 +2,17 @@
 #include "http_session.h"
 
 Tracker::Tracker()
-    : acceptor(io_context, asio::ip::tcp::endpoint(asio::ip::tcp::v4(), 8080)) {
+    : acceptor(io_context, tcp::endpoint(tcp::v4(), 8080)), db(nullptr) {
+    if (!openDatabase("tracker.db")) {
+        std::cerr << "Failed to open database." << std::endl;
+    }
+    if_db_not_created();
     start_accept();
 }
 
 void Tracker::start_accept() {
     acceptor.async_accept(
-        [this](boost::system::error_code ec, asio::ip::tcp::socket socket) {
+        [this](boost::system::error_code ec, tcp::socket socket) {
             if (!ec) {
                 std::cout << "Accepted connection from: " << socket.remote_endpoint().address().to_string() << std::endl;
                 std::make_shared<http_session>(std::move(socket), seeder_ips, *this)->start();
@@ -28,7 +32,7 @@ void Tracker::add_peer(const std::string& peer_ip) {
     std::cout << "Peer added: " << peer_ip << std::endl;
 }
 
-void Tracker::remove_seeder(const std::string &seeder_ip) {
+void Tracker::remove_seeder(const std::string& seeder_ip) {
     auto it = std::find(seeder_ips.begin(), seeder_ips.end(), seeder_ip);
     if (it != seeder_ips.end()) {
         seeder_ips.erase(it);
@@ -38,14 +42,13 @@ void Tracker::remove_seeder(const std::string &seeder_ip) {
     }
 }
 
-void Tracker::remove_peer(const std::string &peer_ip)
-{
-    auto it = std::find(peer_ips.begin(),peer_ips.end(),peer_ip);
+void Tracker::remove_peer(const std::string& peer_ip) {
+    auto it = std::find(peer_ips.begin(), peer_ips.end(), peer_ip);
     if (it != peer_ips.end()) {
         peer_ips.erase(it);
-        std::cout << "Peer removed:" << peer_ip << std::endl;
+        std::cout << "Peer removed: " << peer_ip << std::endl;
     } else {
-        std::cerr <<  "Peer not found" << peer_ip << std::endl;
+        std::cerr << "Peer not found: " << peer_ip << std::endl;
     }
 }
 
@@ -88,16 +91,16 @@ TorrentFile Tracker::get_torrent_file() const {
     return torrent_file;
 }
 
-std::string Tracker::select_file( const std::string &name) {
+std::string Tracker::select_file(const std::string& name) {
     std::string path;
 
     std::string sql = "SELECT path FROM files WHERE name = ?";
-    sqlite3_stmt *stmt = nullptr;
+    sqlite3_stmt* stmt = nullptr;
 
     int rc = sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr);
     if (rc != SQLITE_OK) {
         std::cerr << "Failed to prepare statement: " << sqlite3_errmsg(db) << std::endl;
-        return "";  
+        return "";
     }
 
     sqlite3_bind_text(stmt, 1, name.c_str(), -1, SQLITE_STATIC);
@@ -120,15 +123,15 @@ void Tracker::peer_choosed_file(const std::string& name) {
     std::string path = select_file(name);
 
     if (!path.empty()) {
-        torrent_file.create_torrent_file(path, 5); 
+        torrent_file.create_torrent_file(path, 5); // Example chunk size: 5 bytes
     } else {
         std::cerr << "File not found: " << name << std::endl;
     }
 }
 
-void Tracker::show_available_files( std::stringstream& response_body) const {
+void Tracker::show_available_files(std::stringstream& response_body) const {
     std::string sql = "SELECT name FROM files";
-    sqlite3_stmt *stmt = nullptr;
+    sqlite3_stmt* stmt = nullptr;
 
     int rc = sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr);
     if (rc != SQLITE_OK) {
@@ -149,7 +152,7 @@ void Tracker::show_available_files( std::stringstream& response_body) const {
 
 void Tracker::delete_file(const std::string& name) {
     std::string sql = "DELETE FROM files WHERE name = ?";
-    sqlite3_stmt *stmt = nullptr;
+    sqlite3_stmt* stmt = nullptr;
 
     int rc = sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr);
     if (rc != SQLITE_OK) {
@@ -171,7 +174,7 @@ void Tracker::delete_file(const std::string& name) {
 
 void Tracker::add_file(const std::string& name, const std::string& path) {
     std::string sql = "INSERT INTO files (name, path) VALUES (?, ?)";
-    sqlite3_stmt *stmt = nullptr;
+    sqlite3_stmt* stmt = nullptr;
 
     int rc = sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, nullptr);
     if (rc != SQLITE_OK) {
@@ -192,23 +195,24 @@ void Tracker::add_file(const std::string& name, const std::string& path) {
     sqlite3_finalize(stmt);
 }
 
-
-
-bool openDatabase(const std::string& dbName, sqlite3** db) {
-    return sqlite3_open(dbName.c_str(), db) == SQLITE_OK;
+bool Tracker::openDatabase(const std::string& dbName) {
+    return sqlite3_open(dbName.c_str(), &db) == SQLITE_OK;
 }
 
-void closeDatabase(sqlite3* db) {
-    sqlite3_close(db);
+void Tracker::closeDatabase() {
+    if (db) {
+        sqlite3_close(db);
+        db = nullptr;
+    }
 }
 
-void if_db_not_created(sqlite3* db) {
+void Tracker::if_db_not_created() {
     std::string sql = 
-    "CREATE TABLE IF NOT EXISTS files ("
-    "id INTEGER PRIMARY KEY, "
-    "name TEXT NOT NULL, "
-    "path TEXT NOT NULL"
-    ");";
+        "CREATE TABLE IF NOT EXISTS files ("
+        "id INTEGER PRIMARY KEY, "
+        "name TEXT NOT NULL, "
+        "path TEXT NOT NULL"
+        ");";
 
     char* errMsg = nullptr;
 
