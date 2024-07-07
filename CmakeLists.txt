@@ -4,19 +4,31 @@ project(Tracker)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
+
 find_package(Boost 1.70 REQUIRED COMPONENTS system filesystem)
 find_package(SQLite3 REQUIRED)
 find_package(OpenSSL REQUIRED)
 
+# Set JSON include directory
+set(JSON_INCLUDE_DIR "/opt/homebrew/opt/nlohmann-json/include")
+
+# List of source files
 set(SOURCES
     main.cpp
     tracker.cpp
     torrent.cpp
     seeder.cpp
+    http_session.cpp 
 )
 
-include_directories(${Boost_INCLUDE_DIRS} ${SQLite3_INCLUDE_DIRS})
+
+include_directories(${Boost_INCLUDE_DIRS} ${SQLite3_INCLUDE_DIRS} ${JSON_INCLUDE_DIR})
+
 
 add_executable(tracker ${SOURCES})
 
-target_link_libraries(tracker ${Boost_LIBRARIES} ${SQLite3_LIBRARIES} OpenSSL::Crypto)
+# Link required libraries
+target_link_libraries(tracker 
+                      ${Boost_LIBRARIES} 
+                      ${SQLite3_LIBRARIES} 
+                      OpenSSL::Crypto)

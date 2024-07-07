@@ -7,6 +7,7 @@ Tracker::Tracker()
         std::cerr << "Failed to open database." << std::endl;
     }
     if_db_not_created();
+
     start_accept();
 }
 

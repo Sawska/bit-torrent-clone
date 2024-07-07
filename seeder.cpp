@@ -1,13 +1,39 @@
 #include "seeder.h"
 
-Peer_Seeder::Peer_Seeder() : socket(io_context) {}
+Peer_Seeder::Peer_Seeder()
+    : io_context(),  
+      socket(io_context)  
+{
+    
+}
 
 void Peer_Seeder::connect_to_tracker(const std::string& tracker_ip, unsigned short tracker_port) {
-    tcp::resolver resolver(io_context);
-    auto endpoints = resolver.resolve(tracker_ip, std::to_string(tracker_port));
-    asio::connect(socket, endpoints);
-    std::cout << "Connected to tracker at " << tracker_ip << ":" << tracker_port << std::endl;
+    try {
+        
+        tcp::resolver resolver(io_context);
+        auto endpoints = resolver.resolve(tracker_ip, std::to_string(tracker_port));
+
+        socket.open(tcp::v4());
+        
+        std::cout << "here 1"  << std::endl;
+        asio::connect(socket, endpoints);
+        
+
+        
+        std::cout << "Connected to tracker at " << tracker_ip << ":" << tracker_port << std::endl;
+
+        
+    } catch (const boost::system::system_error& e) {
+        
+        std::cerr << "Boost system error: " << e.what() << std::endl;
+    } catch (const std::exception& e) {
+        
+        std::cerr << "Connection to tracker failed: " << e.what() << std::endl;
+    }
 }
+
+
+
 
 std::string Peer_Seeder::send_request(const std::string& target, const std::string& body) {
     http::request<http::string_body> req{http::verb::post, target, 11};
@@ -56,7 +82,7 @@ void Peer_Seeder::ask_for_file() {
             if (!res.empty()) {
                 std::vector<char> part(res.begin(), res.end());
 
-                if (check_if_part_sended_is_right(part, index, torrent_file)) {
+                if (check_if_part_sended_is_right(part, index)) {
                     file_parts.push_back(part);
                     part_received = true;
                     break;
@@ -217,9 +243,20 @@ void Peer_Seeder::compose_file(const std::string& output_file) {
     std::cout << "Combined file created: " << output_file << std::endl;
 }
 
-bool Peer_Seeder::check_if_part_sended_is_right(const std::vector<char>& part, int index, TorrentFile& tor_file) {
-    return tor_file.hashed_pieces[index] == tor_file.hash_piece(part.data(), part.size(), index);
+bool Peer_Seeder::check_if_part_sended_is_right(const std::vector<char>& part, int index) {
+    
+    if (index < 0 || index >= torrent_file.hashed_pieces.size()) {
+        std::cerr << "Error: Index out of range." << std::endl;
+        return false;
+    }
+
+    
+    std::string expected_hash = torrent_file.hash_piece(part.data(), part.size(), index);
+
+    
+    return torrent_file.hashed_pieces[index] == expected_hash;
 }
+
 
 TorrentFile Peer_Seeder::deserialize_torrent_file(const std::string& json_str) {
     json j = json::parse(json_str);

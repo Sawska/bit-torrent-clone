@@ -7,6 +7,7 @@
 #include <string>
 #include <openssl/sha.h>
 #include <nlohmann/json.hpp>
+#define NUMBER_OF_PIECES 5
 
 using json = nlohmann::json;
 
@@ -16,6 +17,11 @@ public:
     long long size;
     std::string location;
     std::vector<std::string> hashed_pieces;
+
+    TorrentFile() {
+        
+        hashed_pieces.resize(NUMBER_OF_PIECES); 
+    }
 
     void create_torrent_file(const std::string& filepath, int piece_size);
 

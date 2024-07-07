@@ -18,6 +18,8 @@ public:
     std::vector<std::string> seeder_ips;
     std::vector<std::string> peer_ips;
     TorrentFile torrent_file;
+    std::string ip;
+    sqlite3* db;
 
     Tracker();
 
@@ -33,15 +35,15 @@ public:
     void show_available_files(std::stringstream& response_body) const;
     void delete_file(const std::string& name);
     void add_file(const std::string& name, const std::string& path);
+    bool openDatabase(const std::string& dbName);
+    void closeDatabase();
+    void if_db_not_created();
 
 private:
     asio::io_context io_context;
     asio::ip::tcp::acceptor acceptor;
-    sqlite3* db;
+    
 
-    bool openDatabase(const std::string& dbName);
-    void closeDatabase();
-    void if_db_not_created();
 };
 
 #endif // TRACKER_H

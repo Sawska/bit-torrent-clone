@@ -1,5 +1,6 @@
 #include "torrent.h"
 
+
 void TorrentFile::create_torrent_file(const std::string& filepath, int piece_size) {
     size_t last_slash = filepath.find_last_of("/\\");
     if (last_slash != std::string::npos) {
@@ -7,6 +8,8 @@ void TorrentFile::create_torrent_file(const std::string& filepath, int piece_siz
     } else {
         name = filepath;
     }
+
+
 
     std::ifstream file(filepath, std::ios::binary);
     if (!file.is_open()) {
