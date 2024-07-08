@@ -17,11 +17,14 @@ void Tracker::start_accept() {
             if (!ec) {
                 std::cout << "Accepted connection from: " << socket.remote_endpoint().address().to_string() << std::endl;
                 std::make_shared<http_session>(std::move(socket), seeder_ips, *this)->start();
+            } else {
+                std::cerr << "Accept error: " << ec.message() << std::endl;
             }
-            start_accept();
+            start_accept(); 
         }
     );
 }
+
 
 void Tracker::add_seeder(const std::string& seeder_ip) {
     seeder_ips.push_back(seeder_ip);

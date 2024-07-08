@@ -21,6 +21,8 @@ public:
     std::string ip;
     sqlite3* db;
 
+    asio::io_context io_context;
+    asio::ip::tcp::acceptor acceptor;
     Tracker();
 
     void start_accept();
@@ -40,8 +42,6 @@ public:
     void if_db_not_created();
 
 private:
-    asio::io_context io_context;
-    asio::ip::tcp::acceptor acceptor;
     
 
 };

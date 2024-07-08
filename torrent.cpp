@@ -42,7 +42,7 @@ std::string TorrentFile::hash_piece(const char* data, size_t size, int piece_ind
 
     char hex_hash[2 * SHA256_DIGEST_LENGTH + 1];
     for (int j = 0; j < SHA256_DIGEST_LENGTH; ++j) {
-        sprintf(hex_hash + 2 * j, "%02x", hash[j]);
+        snprintf(hex_hash + 2 * j, sizeof(hex_hash) - 2 * j, "%02x", hash[j]);
     }
     hex_hash[2 * SHA256_DIGEST_LENGTH] = '\0';
 

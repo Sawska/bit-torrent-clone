@@ -9,25 +9,19 @@ Peer_Seeder::Peer_Seeder()
 
 void Peer_Seeder::connect_to_tracker(const std::string& tracker_ip, unsigned short tracker_port) {
     try {
-        
         tcp::resolver resolver(io_context);
         auto endpoints = resolver.resolve(tracker_ip, std::to_string(tracker_port));
 
-        socket.open(tcp::v4());
         
-        std::cout << "here 1"  << std::endl;
+        socket.close();
+        
+        socket.open(tcp::v4());
         asio::connect(socket, endpoints);
         
-
-        
         std::cout << "Connected to tracker at " << tracker_ip << ":" << tracker_port << std::endl;
-
-        
     } catch (const boost::system::system_error& e) {
-        
         std::cerr << "Boost system error: " << e.what() << std::endl;
     } catch (const std::exception& e) {
-        
         std::cerr << "Connection to tracker failed: " << e.what() << std::endl;
     }
 }
@@ -36,24 +30,44 @@ void Peer_Seeder::connect_to_tracker(const std::string& tracker_ip, unsigned sho
 
 
 std::string Peer_Seeder::send_request(const std::string& target, const std::string& body) {
-    http::request<http::string_body> req{http::verb::post, target, 11};
-    req.set(http::field::host, ip);
-    req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
-    req.set(http::field::content_type, "text/plain");
-    req.body() = body;
-    req.prepare_payload();
+    try {
+        std::string host = "127.0.0.1:8080";
+        http::request<http::string_body> req{http::verb::post, target, 11};
+        req.set(http::field::host, host);
+        req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
+        req.set(http::field::content_type, "text/plain");
+        req.body() = body;
+        req.prepare_payload();
 
-    http::write(socket, req);
+        http::write(socket, req);
 
-    beast::flat_buffer buffer;
-    http::response<http::string_body> res;
-    http::read(socket, buffer, res);
+        beast::flat_buffer buffer;
+        http::response<http::string_body> res;
+        boost::system::error_code ec;
 
-    std::cout << "Response code: " << res.result_int() << std::endl;
-    std::cout << "Response body: " << res.body() << std::endl;
+        assert(socket.is_open());
+        std::cout << "Sending request to: " << host << " Target: " << target << " Body: " << body << std::endl;
+        http::read(socket, buffer, res, ec);
 
-    return res.body();
+        if (ec) {
+            std::cerr << "Error during HTTP read: " << ec.message() << std::endl;
+            return "";
+        }
+
+        std::cout << "Response code: " << res.result_int() << std::endl;
+        std::cout << "Response body: " << res.body() << std::endl;
+
+        return res.body();
+    } catch (const boost::system::system_error& e) {
+        std::cerr << "Boost system error during request: " << e.what() << std::endl;
+        return "";
+    } catch (const std::exception& e) {
+        std::cerr << "Exception during request: " << e.what() << std::endl;
+        return "";
+    }
 }
+
+
 
 void Peer_Seeder::handle_request() {
     http::read(socket, buffer, request);
@@ -102,7 +116,7 @@ void Peer_Seeder::ask_for_file() {
 }
 
 void Peer_Seeder::ask_for_seeders() {
-    std::string target = "/ask_for_list_of_seeders";
+    std::string target = "/list_seeders";
     std::string res = send_request(target, "");
     process_seeder_list(res);
 }

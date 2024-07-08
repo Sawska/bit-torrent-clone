@@ -26,6 +26,7 @@ public:
     std::vector<std::vector<char>> file_parts; 
     std::vector<std::string> seeder_ips;
     asio::io_context io_context;
+    
     tcp::socket socket{io_context};
     http::request<http::string_body> request;
     TorrentFile torrent_file;
