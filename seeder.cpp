@@ -1,10 +1,14 @@
 #include "seeder.h"
 
-Peer_Seeder::Peer_Seeder()
-    : io_context(),  
-      socket(io_context)  
-{
-    
+
+
+
+Peer_Seeder::Peer_Seeder(asio::io_context& io_context)
+    : io_context(io_context), socket(io_context) {}
+
+
+Peer_Seeder::~Peer_Seeder() {
+    disconnect();
 }
 
 void Peer_Seeder::connect_to_tracker(const std::string& tracker_ip, unsigned short tracker_port) {
@@ -12,12 +16,10 @@ void Peer_Seeder::connect_to_tracker(const std::string& tracker_ip, unsigned sho
         tcp::resolver resolver(io_context);
         auto endpoints = resolver.resolve(tracker_ip, std::to_string(tracker_port));
 
-        
         socket.close();
-        
         socket.open(tcp::v4());
         asio::connect(socket, endpoints);
-        
+
         std::cout << "Connected to tracker at " << tracker_ip << ":" << tracker_port << std::endl;
     } catch (const boost::system::system_error& e) {
         std::cerr << "Boost system error: " << e.what() << std::endl;
@@ -25,9 +27,6 @@ void Peer_Seeder::connect_to_tracker(const std::string& tracker_ip, unsigned sho
         std::cerr << "Connection to tracker failed: " << e.what() << std::endl;
     }
 }
-
-
-
 
 std::string Peer_Seeder::send_request(const std::string& target, const std::string& body) {
     try {
@@ -39,33 +38,53 @@ std::string Peer_Seeder::send_request(const std::string& target, const std::stri
         req.body() = body;
         req.prepare_payload();
 
-        http::write(socket, req);
-
-        beast::flat_buffer buffer;
-        http::response<http::string_body> res;
-        boost::system::error_code ec;
-
-        assert(socket.is_open());
-        std::cout << "Sending request to: " << host << " Target: " << target << " Body: " << body << std::endl;
-        http::read(socket, buffer, res, ec);
-
-        if (ec) {
-            std::cerr << "Error during HTTP read: " << ec.message() << std::endl;
-            return "";
+        if (!socket.is_open()) {
+            throw std::runtime_error("Socket is not open.");
         }
 
-        std::cout << "Response code: " << res.result_int() << std::endl;
-        std::cout << "Response body: " << res.body() << std::endl;
+        
+        std::promise<std::string> response_promise;
+        auto response_future = response_promise.get_future();
 
-        return res.body();
-    } catch (const boost::system::system_error& e) {
-        std::cerr << "Boost system error during request: " << e.what() << std::endl;
-        return "";
+        http::async_write(socket, req,
+            [this, &response_promise](boost::system::error_code ec, std::size_t ) {
+                if (ec) {
+                    response_promise.set_exception(std::make_exception_ptr(std::runtime_error("Error writing request: " + ec.message())));
+                    return;
+                }
+
+                
+                do_async_read(std::move(response_promise));
+            });
+
+        
+        std::future_status status = response_future.wait_for(std::chrono::seconds(10)); 
+
+        if (status == std::future_status::timeout) {
+            throw std::runtime_error("Timeout waiting for response.");
+        }
+
+        return response_future.get(); 
     } catch (const std::exception& e) {
-        std::cerr << "Exception during request: " << e.what() << std::endl;
+        std::cerr << "Exception in send_request: " << e.what() << std::endl;
         return "";
     }
 }
+
+void Peer_Seeder::do_async_read(std::promise<std::string> response_promise) {
+    http::response<http::string_body> response;
+    http::async_read(socket, buffer, response,
+        [this, &response, &response_promise](boost::system::error_code ec, std::size_t ) {
+            if (ec) {
+                response_promise.set_exception(std::make_exception_ptr(std::runtime_error("Error reading response: " + ec.message())));
+                return;
+            }
+
+            
+            response_promise.set_value(response.body());
+        });
+}
+
 
 
 
@@ -117,7 +136,7 @@ void Peer_Seeder::ask_for_file() {
 
 void Peer_Seeder::ask_for_seeders() {
     std::string target = "/list_seeders";
-    std::string res = send_request(target, "");
+    std::string res = send_request(target, ip);
     process_seeder_list(res);
 }
 

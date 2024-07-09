@@ -1,28 +1,26 @@
 #include "http_session.h"
 
-http_session::http_session(asio::ip::tcp::socket socket, const std::vector<std::string>& seeder_ips, Tracker& tracker)
-    : socket(std::move(socket)), seeder_ips(seeder_ips), tracker(tracker) {}
+http_session::http_session(asio::ip::tcp::socket socket, std::vector<std::string>& seeder_ips, Tracker& tracker)
+    : socket_(std::move(socket)), seeder_ips_(seeder_ips), tracker_(tracker) {}
 
 void http_session::start() {
-    read_request();
+    do_read();
 }
 
-void http_session::read_request() {
-    auto self = shared_from_this();
-    http::async_read(
-        socket, buffer, request,
-        [self, this](boost::system::error_code ec, std::size_t bytes_transferred) {
+void http_session::do_read() {
+    auto self(shared_from_this());
+    http::async_read(socket_, buffer_, request_,
+        [self](beast::error_code ec, std::size_t bytes_transferred) {
             if (!ec) {
-                handle_request();
+                self->handle_request();
             }
-        }
-    );
+        });
 }
 
 void http_session::handle_request() {
-    std::string target = std::string(request.target());
+    std::string target = std::string(request_.target());
 
-    if (request.method() != http::verb::post) {
+    if (request_.method() != http::verb::post) {
         send_response(http::status::method_not_allowed, "Method not allowed");
         return;
     }
@@ -50,14 +48,14 @@ void http_session::handle_request() {
 
 void http_session::handle_list_seeders() {
     std::string response_body = "Seeders:\n";
-    for (const auto& seeder : seeder_ips) {
+    for (const auto& seeder : seeder_ips_) {
         response_body += "- " + seeder + "\n";
     }
     send_response(http::status::ok, response_body);
 }
 
 void http_session::handle_send_torrent_file() {
-    TorrentFile torrent = tracker.get_torrent_file();
+    TorrentFile torrent = tracker_.get_torrent_file();
     std::string serialized_torrent = torrent.serialize_to_json();
     send_response(http::status::ok, serialized_torrent);
 }
@@ -65,51 +63,51 @@ void http_session::handle_send_torrent_file() {
 void http_session::handle_send_available_files() {
     std::stringstream response_body;
     response_body << "Available Files:\n";
-    tracker.show_available_files(response_body);
+    tracker_.show_available_files(response_body);
     send_response(http::status::ok, response_body.str());
 }
 
 void http_session::handle_choosed_file() {
-    std::string file_name = request.body();
-    tracker.peer_choosed_file(file_name);
+    std::string file_name = request_.body();
+    tracker_.peer_choosed_file(file_name);
     send_response(http::status::ok, "File chosen successfully: " + file_name);
 }
 
 void http_session::handle_become_seeder() {
-    std::string ip = request.body();
-    tracker.add_seeder(ip);
-    send_response(http::status::ok, "Added your ip " + ip + " to seeders");
+    std::string ip = request_.body();
+    tracker_.add_seeder(ip);
+    send_response(http::status::ok, "Added your IP " + ip + " to seeders");
 }
 
 void http_session::handle_become_peer() {
-    std::string ip = request.body();
-    tracker.add_peer(ip);
-    send_response(http::status::ok, "Added your ip " + ip + " to peers");
+    std::string ip = request_.body();
+    tracker_.add_peer(ip);
+    send_response(http::status::ok, "Added your IP " + ip + " to peers");
 }
 
 void http_session::handle_unbecome_seeder() {
-    std::string ip = request.body();
-    tracker.remove_seeder(ip);
-    send_response(http::status::ok, "Removed your ip " + ip + " from seeders");
+    std::string ip = request_.body();
+    tracker_.remove_seeder(ip);
+    send_response(http::status::ok, "Removed your IP " + ip + " from seeders");
 }
 
 void http_session::handle_unbecome_peer() {
-    std::string ip = request.body();
-    tracker.remove_peer(ip);
-    send_response(http::status::ok, "Removed your ip " + ip + " from peers");
+    std::string ip = request_.body();
+    tracker_.remove_peer(ip);
+    send_response(http::status::ok, "Removed your IP " + ip + " from peers");
 }
 
 void http_session::send_response(http::status status, const std::string& body) {
-    http::response<http::string_body> response{status, request.version()};
-    response.set(http::field::server, "Tracker Server");
-    response.set(http::field::content_type, "text/plain");
-    response.body() = body;
-    response.prepare_payload();
-    auto self = shared_from_this();
-    http::async_write(
-        socket, response,
-        [self, this](boost::system::error_code ec, std::size_t bytes_transferred) {
-            socket.shutdown(asio::ip::tcp::socket::shutdown_send, ec);
-        }
-    );
+    auto self(shared_from_this());
+    http::response<http::string_body> res{status, request_.version()};
+    res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+    res.set(http::field::content_type, "text/plain");
+    res.keep_alive(request_.keep_alive());
+    res.body() = body;
+    res.prepare_payload();
+
+    http::async_write(socket_, res,
+        [self](beast::error_code ec, std::size_t) {
+            self->socket_.shutdown(tcp::socket::shutdown_send, ec);
+        });
 }

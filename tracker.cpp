@@ -2,10 +2,40 @@
 #include "http_session.h"
 
 Tracker::Tracker()
-    : acceptor(io_context, tcp::endpoint(tcp::v4(), 8080)), db(nullptr) {
+    : acceptor(io_context) {
+
+    tcp::endpoint endpoint(asio::ip::make_address("127.0.0.1"), 8080);
+
+    boost::system::error_code ec;
+    acceptor.open(endpoint.protocol(), ec);
+    if (ec) {
+        std::cerr << "Open error: " << ec.message() << std::endl;
+        return;
+    }
+
+    acceptor.set_option(asio::socket_base::reuse_address(true), ec);
+    if (ec) {
+        std::cerr << "Set option error: " << ec.message() << std::endl;
+        return;
+    }
+
+    acceptor.bind(endpoint, ec);
+    if (ec) {
+        std::cerr << "Bind error: " << ec.message() << std::endl;
+        return;
+    }
+
+    acceptor.listen(asio::socket_base::max_listen_connections, ec);
+    if (ec) {
+        std::cerr << "Listen error: " << ec.message() << std::endl;
+        return;
+    }
+
     if (!openDatabase("tracker.db")) {
         std::cerr << "Failed to open database." << std::endl;
+        return;
     }
+
     if_db_not_created();
 
     start_accept();
@@ -24,6 +54,7 @@ void Tracker::start_accept() {
         }
     );
 }
+
 
 
 void Tracker::add_seeder(const std::string& seeder_ip) {
@@ -228,4 +259,7 @@ void Tracker::if_db_not_created() {
     } else {
         std::cout << "Table created successfully or already exists." << std::endl;
     }
+}
+Tracker::~Tracker() {
+    closeDatabase();
 }

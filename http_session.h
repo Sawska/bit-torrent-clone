@@ -9,16 +9,15 @@
 
 namespace asio = boost::asio;
 namespace beast = boost::beast;
-namespace http = boost::beast::http;
+namespace http = beast::http;
 
 class http_session : public std::enable_shared_from_this<http_session> {
 public:
-    http_session(asio::ip::tcp::socket socket, const std::vector<std::string>& seeder_ips, Tracker& tracker);
-
+    explicit http_session(asio::ip::tcp::socket socket, std::vector<std::string>& seeder_ips, Tracker& tracker);
     void start();
 
 private:
-    void read_request();
+    void do_read();
     void handle_request();
     void handle_choosed_file();
     void handle_list_seeders();
@@ -30,11 +29,11 @@ private:
     void handle_unbecome_seeder();
     void handle_unbecome_peer();
 
-    asio::ip::tcp::socket socket;
-    beast::flat_buffer buffer;
-    http::request<http::string_body> request;
-    std::vector<std::string> seeder_ips;
-    Tracker& tracker;
+    asio::ip::tcp::socket socket_;
+    beast::flat_buffer buffer_;
+    http::request<http::string_body> request_;
+    std::vector<std::string>& seeder_ips_;
+    Tracker& tracker_;
 };
 
-#endif // HTTP_SESSION_H
+#endif

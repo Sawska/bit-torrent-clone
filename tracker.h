@@ -23,7 +23,9 @@ public:
 
     asio::io_context io_context;
     asio::ip::tcp::acceptor acceptor;
+
     Tracker();
+    ~Tracker();
 
     void start_accept();
     void add_seeder(const std::string& seeder_ip);
@@ -42,7 +44,6 @@ public:
     void if_db_not_created();
 
 private:
-    
 
 };
 

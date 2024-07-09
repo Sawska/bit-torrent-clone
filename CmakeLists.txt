@@ -1,10 +1,12 @@
 cmake_minimum_required(VERSION 3.10)
 project(Tracker)
 
+# Use C++17 standard
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++")
 
+# Find required packages
 find_package(Boost 1.70 REQUIRED COMPONENTS system filesystem)
 find_package(SQLite3 REQUIRED)
 find_package(OpenSSL REQUIRED)
@@ -21,8 +23,10 @@ set(SOURCES
     http_session.cpp 
 )
 
+# Include directories
 include_directories(${Boost_INCLUDE_DIRS} ${SQLite3_INCLUDE_DIRS} ${JSON_INCLUDE_DIR} /opt/homebrew/opt/openssl/include)
 
+# Add executable
 add_executable(tracker ${SOURCES})
 
 # Link required libraries
