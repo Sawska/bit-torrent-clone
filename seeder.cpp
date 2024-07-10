@@ -4,7 +4,21 @@
 
 
 Peer_Seeder::Peer_Seeder(asio::io_context& io_context)
-    : io_context(io_context), socket(io_context) {}
+    : io_context(io_context), socket(io_context) {
+    boost::system::error_code ec;
+    tcp::endpoint local_endpoint(asio::ip::make_address("127.0.0.2"), 0); // Bind to 127.0.0.2
+    socket.open(local_endpoint.protocol(), ec);
+    if (ec) {
+        std::cerr << "Open error: " << ec.message() << std::endl;
+    }
+    socket.bind(local_endpoint, ec);
+    if (ec) {
+        std::cerr << "Bind error: " << ec.message() << std::endl;
+    }
+}
+
+
+
 
 
 Peer_Seeder::~Peer_Seeder() {
@@ -28,11 +42,11 @@ void Peer_Seeder::connect_to_tracker(const std::string& tracker_ip, unsigned sho
     }
 }
 
+
 std::string Peer_Seeder::send_request(const std::string& target, const std::string& body) {
     try {
-        std::string host = "127.0.0.1:8080";
         http::request<http::string_body> req{http::verb::post, target, 11};
-        req.set(http::field::host, host);
+        req.set(http::field::host, "127.0.0.1:8080");
         req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
         req.set(http::field::content_type, "text/plain");
         req.body() = body;
@@ -41,49 +55,51 @@ std::string Peer_Seeder::send_request(const std::string& target, const std::stri
         if (!socket.is_open()) {
             throw std::runtime_error("Socket is not open.");
         }
-
         
-        std::promise<std::string> response_promise;
-        auto response_future = response_promise.get_future();
+        auto response_promise = std::make_shared<std::promise<std::string>>();
+        auto response_future = response_promise->get_future();
 
         http::async_write(socket, req,
-            [this, &response_promise](boost::system::error_code ec, std::size_t ) {
+            [this, response_promise](boost::system::error_code ec, std::size_t) {
                 if (ec) {
-                    response_promise.set_exception(std::make_exception_ptr(std::runtime_error("Error writing request: " + ec.message())));
+                    response_promise->set_exception(std::make_exception_ptr(std::runtime_error("Error writing request: " + ec.message())));
                     return;
                 }
 
-                
-                do_async_read(std::move(response_promise));
+                std::cout << "Request written successfully, starting async read" << std::endl;
+
+                do_async_read(response_promise);
             });
 
-        
-        std::future_status status = response_future.wait_for(std::chrono::seconds(10)); 
-
-        if (status == std::future_status::timeout) {
-            throw std::runtime_error("Timeout waiting for response.");
-        }
-
-        return response_future.get(); 
+        std::cout << "Waiting for response..." << std::endl;
+             return response_future.get();
     } catch (const std::exception& e) {
         std::cerr << "Exception in send_request: " << e.what() << std::endl;
         return "";
     }
 }
 
-void Peer_Seeder::do_async_read(std::promise<std::string> response_promise) {
-    http::response<http::string_body> response;
-    http::async_read(socket, buffer, response,
-        [this, &response, &response_promise](boost::system::error_code ec, std::size_t ) {
+
+void Peer_Seeder::do_async_read(std::shared_ptr<std::promise<std::string>> response_promise) {
+    auto buffer = std::make_shared<boost::beast::flat_buffer>();
+    auto res = std::make_shared<http::response<http::dynamic_body>>();
+
+    http::async_read(socket, *buffer, *res,
+        [response_promise, buffer, res](boost::system::error_code ec, std::size_t) {
             if (ec) {
-                response_promise.set_exception(std::make_exception_ptr(std::runtime_error("Error reading response: " + ec.message())));
+                response_promise->set_exception(std::make_exception_ptr(std::runtime_error("Error reading response: " + ec.message())));
                 return;
             }
 
-            
-            response_promise.set_value(response.body());
+            std::cout << "Response read successfully, setting promise" << std::endl;
+            std::cout << "Response body: " << boost::beast::buffers_to_string(res->body().data()) << std::endl;
+
+            response_promise->set_value(boost::beast::buffers_to_string(res->body().data()));
         });
 }
+
+
+
 
 
 

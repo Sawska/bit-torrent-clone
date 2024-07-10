@@ -7,6 +7,8 @@
 #include <string>
 #include <boost/asio.hpp>
 #include <boost/beast.hpp>
+#include <mutex>
+#include <condition_variable>
 #include "tracker.h"
 #include "torrent.h"
 #include <boost/algorithm/string.hpp>
@@ -38,7 +40,7 @@ public:
     void process_seeder_list(const std::string& seeder_list);
     void handle_send_file();
     std::string send_request(const std::string& target, const std::string& body);
-    void do_async_read(std::promise<std::string> response_promise);
+    void do_async_read(std::shared_ptr<std::promise<std::string>> response_promise);
     void handle_request();
     void send_response(http::status status, const std::string& body);
     void ask_for_torrent_file();
@@ -59,7 +61,7 @@ public:
 
 private:
     beast::flat_buffer buffer;
-
+    std::mutex mutex_; 
     std::vector<std::string> split(const std::string& s, const std::string& delimiter) {
         std::vector<std::string> parts;
         boost::algorithm::split(parts, s, boost::algorithm::is_any_of(delimiter));
@@ -67,4 +69,4 @@ private:
     }
 };
 
-#endif // SEEDER_H
+#endif 

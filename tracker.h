@@ -7,10 +7,13 @@
 #include <boost/asio.hpp>
 #include <boost/beast.hpp>
 #include <sqlite3.h>
+#include <mutex>
 #include "torrent.h"
+#include "crow.h"
 
 namespace asio = boost::asio;
 namespace beast = boost::beast;
+namespace http = beast::http;
 using tcp = asio::ip::tcp;
 
 class Tracker {
@@ -22,17 +25,18 @@ public:
     sqlite3* db;
 
     asio::io_context io_context;
-    asio::ip::tcp::acceptor acceptor;
 
     Tracker();
     ~Tracker();
 
     void start_accept();
+    void define_routes();
+    void handle_request(http::request<http::string_body> req, tcp::socket& socket);
     void add_seeder(const std::string& seeder_ip);
     void add_peer(const std::string& peer_ip);
     void remove_seeder(const std::string& seeder_ip);
     void remove_peer(const std::string& peer_ip);
-    void list_seeders(const std::string& client_ip, const std::string& port);
+    std::stringstream  list_seeders();
     TorrentFile get_torrent_file() const;
     std::string select_file(const std::string& name);
     void peer_choosed_file(const std::string& name);
@@ -44,7 +48,8 @@ public:
     void if_db_not_created();
 
 private:
-
+    tcp::acceptor acceptor;
+    std::mutex seeder_ips_mutex; 
 };
 
 #endif // TRACKER_H

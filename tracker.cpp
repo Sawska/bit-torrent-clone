@@ -1,9 +1,6 @@
 #include "tracker.h"
-#include "http_session.h"
 
-Tracker::Tracker()
-    : acceptor(io_context) {
-
+Tracker::Tracker() : acceptor(io_context) {
     tcp::endpoint endpoint(asio::ip::make_address("127.0.0.1"), 8080);
 
     boost::system::error_code ec;
@@ -37,24 +34,8 @@ Tracker::Tracker()
     }
 
     if_db_not_created();
-
     start_accept();
 }
-
-void Tracker::start_accept() {
-    acceptor.async_accept(
-        [this](boost::system::error_code ec, tcp::socket socket) {
-            if (!ec) {
-                std::cout << "Accepted connection from: " << socket.remote_endpoint().address().to_string() << std::endl;
-                std::make_shared<http_session>(std::move(socket), seeder_ips, *this)->start();
-            } else {
-                std::cerr << "Accept error: " << ec.message() << std::endl;
-            }
-            start_accept(); 
-        }
-    );
-}
-
 
 
 void Tracker::add_seeder(const std::string& seeder_ip) {
@@ -87,39 +68,15 @@ void Tracker::remove_peer(const std::string& peer_ip) {
     }
 }
 
-void Tracker::list_seeders(const std::string& client_ip, const std::string& port) {
-    std::cout << "Handling list seeders request from IP: " << client_ip << std::endl;
+std::stringstream Tracker::list_seeders() {
 
-    try {
-        asio::io_context io_context;
-        tcp::resolver resolver(io_context);
-        beast::tcp_stream stream(io_context);
-
-        auto const results = resolver.resolve(client_ip, port);
-        stream.connect(results);
 
         std::stringstream body;
         body << "Seeders:\n";
         for (const auto& seeder : seeder_ips) {
             body << "- " << seeder << "\n";
         }
-
-        http::response<http::string_body> res{http::status::ok, 11};
-        res.set(http::field::server, "Tracker Server");
-        res.set(http::field::content_type, "text/plain");
-        res.body() = body.str();
-        res.prepare_payload();
-
-        http::write(stream, res);
-
-        beast::error_code ec;
-        stream.socket().shutdown(tcp::socket::shutdown_both, ec);
-        if (ec && ec != beast::errc::not_connected) {
-            throw beast::system_error{ec};
-        }
-    } catch (std::exception& e) {
-        std::cerr << "Error handling list seeders request: " << e.what() << std::endl;
-    }
+            body;
 }
 
 TorrentFile Tracker::get_torrent_file() const {
@@ -262,4 +219,105 @@ void Tracker::if_db_not_created() {
 }
 Tracker::~Tracker() {
     closeDatabase();
+}
+
+void Tracker::define_routes() {
+    CROW_ROUTE(app, "/")
+    .methods("POST"_method)
+    ([this](const crow::request& req) {
+        auto ip = crow::json::load(req.body)["ip"].s();
+        add_peer(ip);
+        return crow::response("added your IP to peers");
+    });
+
+    CROW_ROUTE(app, "/list_seeders")
+    ([this]() {
+        return crow::response(list_seeders());
+    });
+
+    CROW_ROUTE(app, "/become_seeder")
+    .methods("POST"_method)
+    ([this](const crow::request& req) {
+        auto ip = crow::json::load(req.body)["ip"].s();
+        add_seeder(ip);
+        return crow::response("added as seeder");
+    });
+
+    CROW_ROUTE(app, "/unbecome_seeder")
+    .methods("POST"_method)
+    ([this](const crow::request& req) {
+        auto ip = crow::json::load(req.body)["ip"].s();
+        remove_seeder(ip);
+        return crow::response("removed from seeders");
+    });
+
+    CROW_ROUTE(app, "/send_torrent_file")
+    ([this]() {
+        return crow::response(get_torrent_file());
+    });
+
+    CROW_ROUTE(app, "/available_files")
+    ([this]() {
+        std::stringstream response_body;
+        return crow::response(show_available_files(response_body));
+    });
+
+    CROW_ROUTE(app, "/choosed_file")
+    .methods("POST"_method)
+    ([this](const crow::request& req) {
+        auto name = crow::json::load(req.body)["name"].s();
+        peer_choosed_file(name);
+        return crow::response("file chosen");
+    });
+
+    app.port(8080).multithreaded().run();
+}
+
+
+void Tracker::start_accept() {
+    acceptor.async_accept(
+        [this](boost::system::error_code ec, tcp::socket socket) {
+            if (!ec) {
+                std::cout << "Accepted connection from: " << socket.remote_endpoint().address().to_string() << std::endl;
+                
+                
+                beast::flat_buffer buffer;
+                http::request<http::string_body> req;
+                http::read(socket, buffer, req);
+
+                
+                handle_request(std::move(req), socket);
+            } else {
+                std::cerr << "Accept error: " << ec.message() << std::endl;
+            }
+            start_accept(); 
+        }
+    );
+}
+
+void Tracker::handle_request(http::request<http::string_body> req, tcp::socket& socket) {
+    
+    http::response<http::string_body> res{http::status::ok, req.version()};
+    res.set(http::field::server, "Tracker Server");
+    res.set(http::field::content_type, "text/plain");
+
+    if (req.method() == http::verb::get && req.target() == "/list_seeders") {
+        std::stringstream body;
+        body << "Seeders:\n";
+        for (const auto& seeder : seeder_ips) {
+            body << "- " << seeder << "\n";
+        }
+        res.body() = body.str();
+    } else {
+        res.body() = "Invalid request.";
+    }
+
+    res.prepare_payload();
+    http::write(socket, res);
+
+    beast::error_code ec;
+    socket.shutdown(tcp::socket::shutdown_both, ec);
+    if (ec && ec != beast::errc::not_connected) {
+        std::cerr << "Shutdown error: " << ec.message() << std::endl;
+    }
 }
