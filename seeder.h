@@ -5,20 +5,13 @@
 #include <fstream>
 #include <vector>
 #include <string>
-#include <boost/asio.hpp>
-#include <boost/beast.hpp>
 #include <mutex>
 #include <condition_variable>
 #include "tracker.h"
 #include "torrent.h"
 #include <boost/algorithm/string.hpp>
 #include <nlohmann/json.hpp>
-
-namespace asio = boost::asio;
-namespace beast = boost::beast;
-namespace http = beast::http;
-using tcp = asio::ip::tcp;
-using json = nlohmann::json;
+#include "httplib.h"
 
 class Tracker;
 
@@ -27,24 +20,19 @@ public:
     std::string ip;
     std::vector<std::vector<char>> file_parts;
     std::vector<std::string> seeder_ips;
-    asio::io_context& io_context;
+    httplib::Client http_client;  
 
-    tcp::socket socket;
-    http::request<http::string_body> request;
     TorrentFile torrent_file;
 
-    Peer_Seeder(asio::io_context& io_context);
     ~Peer_Seeder();
 
     void connect_to_tracker(const std::string& tracker_ip, unsigned short tracker_port);
     void process_seeder_list(const std::string& seeder_list);
     void handle_send_file();
-    std::string send_request(const std::string& target, const std::string& body);
-    void do_async_read(std::shared_ptr<std::promise<std::string>> response_promise);
     void handle_request();
-    void send_response(http::status status, const std::string& body);
     void ask_for_torrent_file();
     void ask_for_becoming_seeder();
+    httplib::Result send_request(std::string target,  nlohmann::json request_body);
     void ask_to_unbecome_seeder();
     void ask_to_unbecome_peer();
     void ask_for_file();
@@ -60,8 +48,7 @@ public:
     TorrentFile deserialize_torrent_file(const std::string& json_str);
 
 private:
-    beast::flat_buffer buffer;
-    std::mutex mutex_; 
+    std::mutex mutex_;
     std::vector<std::string> split(const std::string& s, const std::string& delimiter) {
         std::vector<std::string> parts;
         boost::algorithm::split(parts, s, boost::algorithm::is_any_of(delimiter));
@@ -69,4 +56,4 @@ private:
     }
 };
 
-#endif 
+#endif

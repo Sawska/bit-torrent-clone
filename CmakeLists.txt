@@ -1,39 +1,52 @@
 cmake_minimum_required(VERSION 3.10)
 project(Tracker)
 
-# Use C++17 standard
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++")
 
-# Find required packages
+
 find_package(Boost 1.70 REQUIRED COMPONENTS system filesystem)
 find_package(SQLite3 REQUIRED)
 find_package(OpenSSL REQUIRED)
 
-# Set JSON include directory
+set(ASIO_INCLUDE_DIR "/opt/homebrew/Cellar/asio/1.30.2/include")
 set(JSON_INCLUDE_DIR "/opt/homebrew/opt/nlohmann-json/include")
+set(CROW_INCLUDE_DIR "/Users/alexanderkorzh/vcpkg/downloads/Crow-1.2.0/include")
+set(HTTPP_LIB_INCLUDE_DIR "/Users/alexanderkorzh/cpp-httplib/")
 
-# List of source files
+
 set(SOURCES
     main.cpp
     tracker.cpp
     torrent.cpp
     seeder.cpp
 )
-set(CMAKE_TOOLCHAIN_FILE "${CMAKE_SOURCE_DIR}/vcpkg/scripts/buildsystems/vcpkg.cmake")
-find_package(Crow CONFIG REQUIRED)
-# Include directories
-include_directories(${Boost_INCLUDE_DIRS} ${SQLite3_INCLUDE_DIRS} ${JSON_INCLUDE_DIR} /opt/homebrew/opt/openssl/include)
 
-# Add executable
+
+include_directories(${Boost_INCLUDE_DIRS} 
+                    ${SQLite3_INCLUDE_DIRS} 
+                    ${JSON_INCLUDE_DIR} 
+                    ${ASIO_INCLUDE_DIR} 
+                    ${CROW_INCLUDE_DIR} 
+                    ${HTTPP_LIB_INCLUDE_DIR})
+
+
 add_executable(tracker ${SOURCES})
 
-# Link required libraries
+
+
 target_link_libraries(tracker 
                       ${Boost_LIBRARIES} 
                       ${SQLite3_LIBRARIES} 
                       OpenSSL::Crypto
                       OpenSSL::SSL
                       /opt/homebrew/opt/openssl/lib/libssl.dylib
-                      /opt/homebrew/opt/openssl/lib/libcrypto.dylib)
+                      /opt/homebrew/opt/openssl/lib/libcrypto.dylib
+                      uWS)
+
+# Add headers from uWebSockets
+target_include_directories(tracker PRIVATE
+    ${UWEBSOCKETS_INCLUDE_DIR}
+)

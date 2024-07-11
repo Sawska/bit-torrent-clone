@@ -11,10 +11,10 @@
 #include "torrent.h"
 #include "crow.h"
 
-namespace asio = boost::asio;
-namespace beast = boost::beast;
-namespace http = beast::http;
-using tcp = asio::ip::tcp;
+// namespace asio = boost::asio;
+// namespace beast = boost::beast;
+// namespace http = beast::http;
+// using tcp = asio::ip::tcp;
 
 class Tracker {
 public:
@@ -24,19 +24,19 @@ public:
     std::string ip;
     sqlite3* db;
 
-    asio::io_context io_context;
+    // asio::io_context io_context;
 
-    Tracker();
+    // Tracker();
     ~Tracker();
-
-    void start_accept();
+    std::string list_seeders();
+    std::string list_peer();
+    // void start_accept();
     void define_routes();
-    void handle_request(http::request<http::string_body> req, tcp::socket& socket);
+    // void handle_request(http::request<http::string_body> req, tcp::socket& socket);
     void add_seeder(const std::string& seeder_ip);
     void add_peer(const std::string& peer_ip);
     void remove_seeder(const std::string& seeder_ip);
     void remove_peer(const std::string& peer_ip);
-    std::stringstream  list_seeders();
     TorrentFile get_torrent_file() const;
     std::string select_file(const std::string& name);
     void peer_choosed_file(const std::string& name);
@@ -48,8 +48,6 @@ public:
     void if_db_not_created();
 
 private:
-    tcp::acceptor acceptor;
-    std::mutex seeder_ips_mutex; 
 };
 
 #endif // TRACKER_H

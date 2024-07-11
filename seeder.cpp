@@ -3,20 +3,11 @@
 
 
 
-Peer_Seeder::Peer_Seeder(asio::io_context& io_context)
-    : io_context(io_context), socket(io_context) {
-    boost::system::error_code ec;
-    tcp::endpoint local_endpoint(asio::ip::make_address("127.0.0.2"), 0); // Bind to 127.0.0.2
-    socket.open(local_endpoint.protocol(), ec);
-    if (ec) {
-        std::cerr << "Open error: " << ec.message() << std::endl;
-    }
-    socket.bind(local_endpoint, ec);
-    if (ec) {
-        std::cerr << "Bind error: " << ec.message() << std::endl;
-    }
-}
 
+
+void Peer_Seeder::connect_to_tracker(const std::string& tracker_ip, unsigned short tracker_port) {
+    http_client = httplib::Client(tracker_ip.c_str(), tracker_port);
+}
 
 
 
@@ -25,95 +16,83 @@ Peer_Seeder::~Peer_Seeder() {
     disconnect();
 }
 
-void Peer_Seeder::connect_to_tracker(const std::string& tracker_ip, unsigned short tracker_port) {
-    try {
-        tcp::resolver resolver(io_context);
-        auto endpoints = resolver.resolve(tracker_ip, std::to_string(tracker_port));
-
-        socket.close();
-        socket.open(tcp::v4());
-        asio::connect(socket, endpoints);
-
-        std::cout << "Connected to tracker at " << tracker_ip << ":" << tracker_port << std::endl;
-    } catch (const boost::system::system_error& e) {
-        std::cerr << "Boost system error: " << e.what() << std::endl;
-    } catch (const std::exception& e) {
-        std::cerr << "Connection to tracker failed: " << e.what() << std::endl;
-    }
-}
 
 
-std::string Peer_Seeder::send_request(const std::string& target, const std::string& body) {
-    try {
-        http::request<http::string_body> req{http::verb::post, target, 11};
-        req.set(http::field::host, "127.0.0.1:8080");
-        req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
-        req.set(http::field::content_type, "text/plain");
-        req.body() = body;
-        req.prepare_payload();
 
-        if (!socket.is_open()) {
-            throw std::runtime_error("Socket is not open.");
-        }
+// std::string Peer_Seeder::send_request(const std::string& target, const std::string& body) {
+//     try {
+//         http::request<http::string_body> req{http::verb::post, target, 11};
+//         req.set(http::field::host, "127.0.0.1:8080");
+//         req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
+//         req.set(http::field::content_type, "text/plain");
+//         req.body() = body;
+//         req.prepare_payload();
+
+//         if (!socket.is_open()) {
+//             throw std::runtime_error("Socket is not open.");
+//         }
         
-        auto response_promise = std::make_shared<std::promise<std::string>>();
-        auto response_future = response_promise->get_future();
+//         auto response_promise = std::make_shared<std::promise<std::string>>();
+//         auto response_future = response_promise->get_future();
 
-        http::async_write(socket, req,
-            [this, response_promise](boost::system::error_code ec, std::size_t) {
-                if (ec) {
-                    response_promise->set_exception(std::make_exception_ptr(std::runtime_error("Error writing request: " + ec.message())));
-                    return;
-                }
+//         http::async_write(socket, req,
+//             [this, response_promise](boost::system::error_code ec, std::size_t) {
+//                 if (ec) {
+//                     response_promise->set_exception(std::make_exception_ptr(std::runtime_error("Error writing request: " + ec.message())));
+//                     return;
+//                 }
 
-                std::cout << "Request written successfully, starting async read" << std::endl;
+//                 std::cout << "Request written successfully, starting async read" << std::endl;
 
-                do_async_read(response_promise);
-            });
+//                 do_async_read(response_promise);
+//             });
 
-        std::cout << "Waiting for response..." << std::endl;
-             return response_future.get();
-    } catch (const std::exception& e) {
-        std::cerr << "Exception in send_request: " << e.what() << std::endl;
-        return "";
-    }
-}
-
-
-void Peer_Seeder::do_async_read(std::shared_ptr<std::promise<std::string>> response_promise) {
-    auto buffer = std::make_shared<boost::beast::flat_buffer>();
-    auto res = std::make_shared<http::response<http::dynamic_body>>();
-
-    http::async_read(socket, *buffer, *res,
-        [response_promise, buffer, res](boost::system::error_code ec, std::size_t) {
-            if (ec) {
-                response_promise->set_exception(std::make_exception_ptr(std::runtime_error("Error reading response: " + ec.message())));
-                return;
-            }
-
-            std::cout << "Response read successfully, setting promise" << std::endl;
-            std::cout << "Response body: " << boost::beast::buffers_to_string(res->body().data()) << std::endl;
-
-            response_promise->set_value(boost::beast::buffers_to_string(res->body().data()));
-        });
-}
+//         std::cout << "Waiting for response..." << std::endl;
+//              return response_future.get();
+//     } catch (const std::exception& e) {
+//         std::cerr << "Exception in send_request: " << e.what() << std::endl;
+//         return "";
+//     }
+// }
 
 
+// void Peer_Seeder::do_async_read(std::shared_ptr<std::promise<std::string>> response_promise) {
+//     auto buffer = std::make_shared<boost::beast::flat_buffer>();
+//     auto res = std::make_shared<http::response<http::dynamic_body>>();
+
+//     http::async_read(socket, *buffer, *res,
+//         [response_promise, buffer, res](boost::system::error_code ec, std::size_t) {
+//             if (ec) {
+//                 response_promise->set_exception(std::make_exception_ptr(std::runtime_error("Error reading response: " + ec.message())));
+//                 return;
+//             }
+
+//             std::cout << "Response read successfully, setting promise" << std::endl;
+//             std::cout << "Response body: " << boost::beast::buffers_to_string(res->body().data()) << std::endl;
+
+//             response_promise->set_value(boost::beast::buffers_to_string(res->body().data()));
+//         });
+// }
+
+
+// std::string Peer_Seeder::send_request(std::string target,std::string body)
+// {
+        
+// }
 
 
 
 
+// void Peer_Seeder::handle_request() {
+//     http::read(socket, buffer, request);
+//     std::string target = std::string(request.target());
 
-void Peer_Seeder::handle_request() {
-    http::read(socket, buffer, request);
-    std::string target = std::string(request.target());
-
-    if (target == "/send_file") {
-        handle_send_file();
-    } else {
-        send_response(http::status::not_found, "Not Found");
-    }
-}
+//     if (target == "/send_file") {
+//         handle_send_file();
+//     } else {
+//         send_response(http::status::not_found, "Not Found");
+//     }
+// }
 
 void Peer_Seeder::ask_for_file() {
     ask_for_seeders();
@@ -126,7 +105,7 @@ void Peer_Seeder::ask_for_file() {
         for (const auto& seeder_ip : seeder_ips) {
             connect_to_tracker(seeder_ip, 80);
             std::string target = "/send_file";
-            std::string res = send_request(target, index_str);
+            std::string res = send_request(target, index_str)->body;
 
             if (!res.empty()) {
                 std::vector<char> part(res.begin(), res.end());
@@ -152,8 +131,8 @@ void Peer_Seeder::ask_for_file() {
 
 void Peer_Seeder::ask_for_seeders() {
     std::string target = "/list_seeders";
-    std::string res = send_request(target, ip);
-    process_seeder_list(res);
+    httplib::Result res = send_request(target, ip);
+    process_seeder_list(res->body);
 }
 
 void Peer_Seeder::process_seeder_list(const std::string& seeder_list) {
@@ -173,51 +152,84 @@ void Peer_Seeder::process_seeder_list(const std::string& seeder_list) {
     }
 }
 
-void Peer_Seeder::handle_send_file() {
-    int index = std::stoi(request.body());
+// void Peer_Seeder::handle_send_file() {
+//     int index = std::stoi(request.body());
 
-    if (!check_if_part_available(index)) {
-        send_response(http::status::ok, "");
-        return;
-    }
+//     if (!check_if_part_available(index)) {
+//         send_response(http::status::ok, "");
+//         return;
+//     }
 
-    std::string part_str(file_parts[index].begin(), file_parts[index].end());
-    send_response(http::status::ok, part_str);
-}
+//     std::string part_str(file_parts[index].begin(), file_parts[index].end());
+//     send_response(http::status::ok, part_str);
+// }
 
-void Peer_Seeder::send_response(http::status status, const std::string& body) {
-    http::response<http::string_body> response{status, request.version()};
-    response.set(http::field::server, "Peer Seeder");
-    response.set(http::field::content_type, "text/plain");
-    response.body() = body;
-    response.prepare_payload();
-    http::write(socket, response);
-}
+// void Peer_Seeder::send_response(http::status status, const std::string& body) {
+//     http::response<http::string_body> response{status, request.version()};
+//     response.set(http::field::server, "Peer Seeder");
+//     response.set(http::field::content_type, "text/plain");
+//     response.body() = body;
+//     response.prepare_payload();
+//     http::write(socket, response);
+// }
 
 void Peer_Seeder::ask_for_torrent_file() {
     std::string target = "/send_torrent_file";
-    std::string res = send_request(target, "");
-    torrent_file = deserialize_torrent_file(res);
+    httplib::Result res = send_request(target, "");
+    torrent_file = deserialize_torrent_file(res->body);
 }
 
 void Peer_Seeder::ask_for_becoming_seeder() {
     std::string target = "/become_seeder";
-    send_request(target, ip);
+     nlohmann::json request_body;
+    request_body["ip"] = ip;
+    
+    httplib::Result res = send_request(target,request_body);
+
+
+    if (res && res->status == 200) {
+        std::cout << res->body << std::endl;
+    } else {
+        std::cerr << "Failed to become a seeder" << std::endl;
+    }
+}
+
+httplib::Result Peer_Seeder::send_request(std::string target,  nlohmann::json request_body) {
+      httplib::Result res = http_client.Post(target, request_body.dump(), "application/json");
+    return res;
 }
 
 void Peer_Seeder::ask_to_unbecome_seeder() {
     std::string target = "/unbecome_seeder";
-    send_request(target, ip);
+    nlohmann::json request_body;
+    request_body["ip"] = ip;
+   httplib::Result res = send_request(target, ip);
+
+   if (res && res->status == 200) {
+        std::cout << res->body << std::endl;
+    } else {
+        std::cerr << "Failed to become a seeder" << std::endl;
+    }
 }
 
 void Peer_Seeder::ask_to_unbecome_peer() {
     std::string target = "/unbecome_peer";
-    send_request(target, ip);
+    nlohmann::json request_body;
+    request_body["ip"] = ip;
+    httplib::Result res = send_request(target, ip);
+
+    if (res && res->status == 200) {
+        std::cout << res->body << std::endl;
+    } else {
+        std::cerr << "Failed to become a seeder" << std::endl;
+    }
 }
 
 void Peer_Seeder::show_available_files() {
     std::string target = "/available_files";
-    std::string res = send_request(target, "");
+    httplib::Result res_http = send_request(target, "");
+    std::string res = res_http->body;
+
 
     std::cout << "Available Files from Tracker:\n" << res << std::endl;
 
@@ -255,12 +267,12 @@ int Peer_Seeder::choose_file(int first, int last) {
 
 void Peer_Seeder::choosed_file(const std::string& file_name) {
     std::string target = "/choosed_file";
-    std::string response = send_request(target, file_name);
+    std::string response = send_request(target, file_name)->body;
     std::cout << "Response from server: " << response << std::endl;
 }
 
 void Peer_Seeder::disconnect() {
-    socket.close();
+    http_client.~Client();
     std::cout << "Disconnected from tracker" << std::endl;
 }
 
