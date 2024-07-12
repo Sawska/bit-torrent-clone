@@ -21,6 +21,9 @@ public:
     std::vector<std::vector<char>> file_parts;
     std::vector<std::string> seeder_ips;
     httplib::Client http_client;  
+    
+    Peer_Seeder(const std::string& ip)
+        : ip(ip), http_client("") {}
 
     TorrentFile torrent_file;
 
@@ -28,11 +31,11 @@ public:
 
     void connect_to_tracker(const std::string& tracker_ip, unsigned short tracker_port);
     void process_seeder_list(const std::string& seeder_list);
-    void handle_send_file();
-    void handle_request();
+    // void handle_send_file();
     void ask_for_torrent_file();
     void ask_for_becoming_seeder();
-    httplib::Result send_request(std::string target,  nlohmann::json request_body);
+    httplib::Result send_request_get(std::string target);
+    httplib::Result send_request_Pos(std::string target,  nlohmann::json request_body);
     void ask_to_unbecome_seeder();
     void ask_to_unbecome_peer();
     void ask_for_file();

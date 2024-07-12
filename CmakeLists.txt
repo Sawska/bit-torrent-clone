@@ -44,7 +44,7 @@ target_link_libraries(tracker
                       OpenSSL::SSL
                       /opt/homebrew/opt/openssl/lib/libssl.dylib
                       /opt/homebrew/opt/openssl/lib/libcrypto.dylib
-                      uWS)
+                    )
 
 # Add headers from uWebSockets
 target_include_directories(tracker PRIVATE

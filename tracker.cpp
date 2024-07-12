@@ -234,8 +234,9 @@ void Tracker::define_routes() {
     crow::SimpleApp app;
 
     CROW_ROUTE(app, "/")
-    .methods(crow::HTTPMethod::GET) 
+    .methods(crow::HTTPMethod::POST) 
     ([this](const crow::request& req) {
+        std::cout << "here" << std::endl;
         auto ip = crow::json::load(req.body)["ip"].s();
         add_peer(ip);
         return crow::response("added your IP to peers");
@@ -253,14 +254,20 @@ void Tracker::define_routes() {
     });
 
     CROW_ROUTE(app, "/become_seeder")
-.methods(crow::HTTPMethod::Post)
-([this](const crow::request& req) {
-    std::string ip = crow::json::load(req.body)["ip"].s();
-    add_seeder(ip);
-    
-    std::string response_message = "added as seeder " + ip;
-    return crow::response(response_message);
-});
+    .methods(crow::HTTPMethod::Post)
+    ([this](const crow::request& req) {
+        auto json_body = crow::json::load(req.body);
+        if (!json_body) {
+            return crow::response(400, "Invalid JSON");
+        }
+
+        std::string ip = json_body["ip"].s();
+        this->add_seeder(ip); 
+        
+        std::string response_message = "added as seeder " + ip;
+        return crow::response(200, response_message);
+    });
+
 
 
     CROW_ROUTE(app, "/unbecome_seeder")
@@ -272,11 +279,13 @@ void Tracker::define_routes() {
     });
 
     CROW_ROUTE(app, "/send_torrent_file")
+    .methods(crow::HTTPMethod::Get) 
     ([this]() {
         return crow::response(get_torrent_file().serialize_to_json().dump()); 
     });
 
     CROW_ROUTE(app, "/available_files")
+    .methods(crow::HTTPMethod::Get) 
     ([this]() {
         std::stringstream response_body;
         add_file("example1.txt","path1");
