@@ -23,6 +23,7 @@ public:
     TorrentFile torrent_file;
     std::string ip;
     sqlite3* db;
+    crow::SimpleApp app;
 
     // asio::io_context io_context;
 
@@ -46,7 +47,6 @@ public:
     bool openDatabase(const std::string& dbName);
     void closeDatabase();
     void if_db_not_created();
-
 private:
 };
 

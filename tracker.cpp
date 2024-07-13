@@ -231,13 +231,14 @@ Tracker::~Tracker() {
 #include <iostream>  // Ensure necessary includes
 
 void Tracker::define_routes() {
-    crow::SimpleApp app;
+    // crow::SimpleApp app;
 
     CROW_ROUTE(app, "/")
     .methods(crow::HTTPMethod::POST) 
     ([this](const crow::request& req) {
-        std::cout << "here" << std::endl;
+        
         auto ip = crow::json::load(req.body)["ip"].s();
+        std::cout << ip << std::endl;
         add_peer(ip);
         return crow::response("added your IP to peers");
     });
@@ -257,6 +258,7 @@ void Tracker::define_routes() {
     .methods(crow::HTTPMethod::Post)
     ([this](const crow::request& req) {
         auto json_body = crow::json::load(req.body);
+        std::cout << req.body << std::endl;
         if (!json_body) {
             return crow::response(400, "Invalid JSON");
         }
@@ -276,6 +278,14 @@ void Tracker::define_routes() {
         auto ip = crow::json::load(req.body)["ip"].s();
         remove_seeder(ip);
         return crow::response("removed from seeders");
+    });
+
+    CROW_ROUTE(app, "/unbecome_peer")
+    .methods(crow::HTTPMethod::Post)
+    ([this](const crow::request& req) {
+        auto ip = crow::json::load(req.body)["ip"].s();
+        remove_peer(ip);
+        return crow::response("removed from peers");
     });
 
     CROW_ROUTE(app, "/send_torrent_file")
@@ -298,12 +308,14 @@ void Tracker::define_routes() {
     CROW_ROUTE(app, "/choosed_file")
     .methods(crow::HTTPMethod::Post)
     ([this](const crow::request& req) {
+
         auto name = crow::json::load(req.body)["name"].s();
+        std::cout <<  "from Crow " + req.body << std::endl;
         peer_choosed_file(name);
         return crow::response("file chosen");
     });
 
-    app.bindaddr("127.0.0.1").port(8080).multithreaded().run();
+    // app.bindaddr("127.0.0.1").port(8080).multithreaded().run();
 }
 
 

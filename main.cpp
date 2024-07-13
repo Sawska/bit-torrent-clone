@@ -7,30 +7,40 @@ void run_tracker(Tracker& tracker) {
     sqlite3* db = nullptr;
     tracker.db = db;
     tracker.openDatabase("tracker.db");
-    tracker.define_routes();
+    tracker.add_file("exampleLizok.txt","exampleLizok.txt");
     
     tracker.define_routes();
+    tracker.app.bindaddr("127.0.0.1").port(8080).multithreaded().run();
 }
 
 int main() {
-    
     Tracker tracker;
-
-    
     std::thread tracker_thread(run_tracker, std::ref(tracker));
 
     
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+
+    
     Peer_Seeder peer_seeder("127.0.0.1");
+
+    
     peer_seeder.connect_to_tracker("127.0.0.1", 8080);
-    nlohmann::json request_body;
-    request_body["ip"] = peer_seeder.ip;
 
-    // peer_seeder.send_request_Pos("/",request_body);
+    
+    peer_seeder.main_exchange();
 
-    peer_seeder.ask_for_becoming_seeder();
-    // peer_seeder.ask_for_seeders();
-    // peer_seeder.ask_to_unbecome_seeder();
 
+    peer_seeder.show_available_files();
+    
+    peer_seeder.choosed_file("exampleLizok.txt");
+
+    peer_seeder.ask_for_torrent_file();
+
+
+
+    std::cout << peer_seeder.torrent_file.name << std::endl;
+    
+    
     
     tracker_thread.join();
 

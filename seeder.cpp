@@ -6,7 +6,7 @@
 
 
 void Peer_Seeder::connect_to_tracker(const std::string& tracker_ip, unsigned short tracker_port) {
-    http_client = httplib::Client(tracker_ip.c_str(), tracker_port);
+    http_client = httplib::Client(tracker_ip, tracker_port);
 }
 
 
@@ -119,7 +119,12 @@ void Peer_Seeder::process_seeder_list(const std::string& seeder_list) {
 void Peer_Seeder::ask_for_torrent_file() {
     std::string target = "/send_torrent_file";
     httplib::Result res = send_request_get(target);
+    std::cout << res->body << std::endl;
     torrent_file = deserialize_torrent_file(res->body);
+}
+
+void Peer_Seeder::be_seeder(std::string ip,int port) {
+    CROW_ROUTE("/sen")
 }
 
 
@@ -128,7 +133,7 @@ void Peer_Seeder::ask_for_becoming_seeder() {
     nlohmann::json request_body;
     request_body["ip"] = ip;
 
-    std::cout << "Request Body: " << request_body << std::endl;
+    // std::cout << "Request Body: " << request_body << std::endl;
 
     httplib::Result res = send_request_Pos(target, request_body);
 
@@ -145,13 +150,14 @@ void Peer_Seeder::ask_for_becoming_seeder() {
 }
 
 httplib::Result Peer_Seeder::send_request_Pos(std::string target, nlohmann::json request_body) {
-    return http_client.Post(target.c_str(), request_body.dump(), "application/json");
+    std::cout << request_body.dump() << std::endl;
+    return http_client.Post(target, request_body.dump(), "application/json");
 }
 
 httplib::Result Peer_Seeder::send_request_get(std::string target)
 {
     httplib::Result res = http_client.Get(target);
-    return httplib::Result();
+    return res;
 }
 
 
@@ -159,7 +165,7 @@ void Peer_Seeder::ask_to_unbecome_seeder() {
     std::string target = "/unbecome_seeder";
     nlohmann::json request_body;
     request_body["ip"] = ip;
-   httplib::Result res = send_request_Pos(target, ip);
+   httplib::Result res = send_request_Pos(target, request_body);
 
    if (res && res->status == 200) {
         std::cout << res->body << std::endl;
@@ -168,16 +174,40 @@ void Peer_Seeder::ask_to_unbecome_seeder() {
     }
 }
 
+void Peer_Seeder::main_exchange()
+{
+    std::string target = "/";
+    nlohmann::json request_body;
+    request_body["ip"] = ip;
+    httplib::Result res = send_request_Pos(target, request_body);
+
+    if (res) {
+        std::cout << "Response Status: " << res->status << std::endl;
+        if (res->status == 200) {
+            std::cout << "Response Body: " << res->body << std::endl;
+        } else {
+            std::cerr << "Failed to become a seeder, Status Code: " << res->status << std::endl;
+        }
+    } else {
+        std::cerr << "Failed to send request" << std::endl;
+    }
+}
+
 void Peer_Seeder::ask_to_unbecome_peer() {
     std::string target = "/unbecome_peer";
     nlohmann::json request_body;
     request_body["ip"] = ip;
-    httplib::Result res = send_request_Pos(target, ip);
+    httplib::Result res = send_request_Pos(target, request_body);
 
-    if (res && res->status == 200) {
-        std::cout << res->body << std::endl;
+    if (res) {
+        std::cout << "Response Status: " << res->status << std::endl;
+        if (res->status == 200) {
+            std::cout << "Response Body: " << res->body << std::endl;
+        } else {
+            std::cerr << "Failed to become a seeder, Status Code: " << res->status << std::endl;
+        }
     } else {
-        std::cerr << "Failed to become a seeder" << std::endl;
+        std::cerr << "Failed to send request" << std::endl;
     }
 }
 
@@ -189,22 +219,12 @@ void Peer_Seeder::show_available_files() {
 
     std::cout << "Available Files from Tracker:\n" << res << std::endl;
 
-    std::cout << "-1 Leave" << std::endl;
 
     std::vector<std::string> parts = split(res, ":");
     int num_files = std::stoi(parts[0]);
 
     for (int i = 0; i < num_files; ++i) {
         std::cout << i << ": " << parts[i * 2 + 1] << std::endl;
-    }
-
-    int index = choose_file(0, num_files - 1);
-
-    if (index == -1) {
-        std::cout << "User chose to leave." << std::endl;
-    } else {
-        std::string name = parts[index * 2 + 1];
-        std::cout << "User chose file: " << name << std::endl;
     }
 }
 
@@ -223,7 +243,9 @@ int Peer_Seeder::choose_file(int first, int last) {
 
 void Peer_Seeder::choosed_file(const std::string& file_name) {
     std::string target = "/choosed_file";
-    std::string response = send_request_Pos(target, file_name)->body;
+    nlohmann::json request_body;
+    request_body["name"] = file_name;
+    std::string response = send_request_Pos(target, request_body)->body;
     std::cout << "Response from server: " << response << std::endl;
 }
 
