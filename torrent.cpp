@@ -9,32 +9,33 @@ void TorrentFile::create_torrent_file(const std::string& filepath, int piece_siz
         name = filepath;
     }
 
-
-
     std::ifstream file(filepath, std::ios::binary);
     if (!file.is_open()) {
         std::cerr << "Failed to open file: " << filepath << std::endl;
         return;
     }
+    location = filepath;
 
     file.seekg(0, std::ios::end);
     size = file.tellg();
     file.seekg(0, std::ios::beg);
 
     hashed_pieces.clear();
+    std::vector<char> buffer(piece_size);
 
-    char buffer[piece_size];
     for (int i = 0; i < num_pieces(piece_size); ++i) {
-        file.read(buffer, piece_size);
+        file.read(buffer.data(), piece_size);
         int read_size = file.gcount();
 
-        std::string hash_str = hash_piece(buffer, read_size, i);
+        std::cout << std::string(buffer.data(), read_size) << std::endl;
+        std::string hash_str = hash_piece(buffer.data(), read_size, i);
         hashed_pieces.push_back(hash_str);
     }
 
     file.close();
     std::cout << "Torrent file created for: " << filepath << std::endl;
 }
+
 
 std::string TorrentFile::hash_piece(const char* data, size_t size, int piece_index) {
     unsigned char hash[SHA256_DIGEST_LENGTH];

@@ -10,11 +10,9 @@
 #include <mutex>
 #include "torrent.h"
 #include "crow.h"
+#include <fstream>
 
-// namespace asio = boost::asio;
-// namespace beast = boost::beast;
-// namespace http = beast::http;
-// using tcp = asio::ip::tcp;
+
 
 class Tracker {
 public:
@@ -25,15 +23,13 @@ public:
     sqlite3* db;
     crow::SimpleApp app;
 
-    // asio::io_context io_context;
-
-    // Tracker();
+    
     ~Tracker();
     std::string list_seeders();
     std::string list_peer();
-    // void start_accept();
+    
     void define_routes();
-    // void handle_request(http::request<http::string_body> req, tcp::socket& socket);
+    
     void add_seeder(const std::string& seeder_ip);
     void add_peer(const std::string& peer_ip);
     void remove_seeder(const std::string& seeder_ip);
@@ -47,6 +43,7 @@ public:
     bool openDatabase(const std::string& dbName);
     void closeDatabase();
     void if_db_not_created();
+    void create_example_file(const std::string& filename, std::size_t size_kb);
 private:
 };
 

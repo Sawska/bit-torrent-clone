@@ -1,43 +1,5 @@
 #include "tracker.h"
 
-// Tracker::Tracker() : acceptor(io_context) {
-//     tcp::endpoint endpoint(asio::ip::make_address("127.0.0.1"), 8080);
-
-//     boost::system::error_code ec;
-//     acceptor.open(endpoint.protocol(), ec);
-//     if (ec) {
-//         std::cerr << "Open error: " << ec.message() << std::endl;
-//         return;
-//     }
-
-//     acceptor.set_option(asio::socket_base::reuse_address(true), ec);
-//     if (ec) {
-//         std::cerr << "Set option error: " << ec.message() << std::endl;
-//         return;
-//     }
-
-//     acceptor.bind(endpoint, ec);
-//     if (ec) {
-//         std::cerr << "Bind error: " << ec.message() << std::endl;
-//         return;
-//     }
-
-//     acceptor.listen(asio::socket_base::max_listen_connections, ec);
-//     if (ec) {
-//         std::cerr << "Listen error: " << ec.message() << std::endl;
-//         return;
-//     }
-
-//     if (!openDatabase("tracker.db")) {
-//         std::cerr << "Failed to open database." << std::endl;
-//         return;
-//     }
-
-//     if_db_not_created();
-//     start_accept();
-// }
-
-
 void Tracker::add_seeder(const std::string& seeder_ip) {
     seeder_ips.push_back(seeder_ip);
     std::cout << "Seeder added: " << seeder_ip << std::endl;
@@ -93,6 +55,8 @@ TorrentFile Tracker::get_torrent_file() const {
 std::string Tracker::select_file(const std::string& name) {
     std::string path;
 
+    std::cout <<  "file name " + name << std::endl;
+
     std::string sql = "SELECT path FROM files WHERE name = ?";
     sqlite3_stmt* stmt = nullptr;
 
@@ -122,7 +86,7 @@ void Tracker::peer_choosed_file(const std::string& name) {
     std::string path = select_file(name);
 
     if (!path.empty()) {
-        torrent_file.create_torrent_file(path, 5); // Example chunk size: 5 bytes
+        torrent_file.create_torrent_file(path, 5);
     } else {
         std::cerr << "File not found: " << name << std::endl;
     }
@@ -228,18 +192,17 @@ Tracker::~Tracker() {
     closeDatabase();
 }
 
-#include <iostream>  // Ensure necessary includes
+
 
 void Tracker::define_routes() {
-    // crow::SimpleApp app;
-
     CROW_ROUTE(app, "/")
     .methods(crow::HTTPMethod::POST) 
     ([this](const crow::request& req) {
         
-        auto ip = crow::json::load(req.body)["ip"].s();
+        std::string ip = crow::json::load(req.body)["ip"].s();
+        std::string  port = crow::json::load(req.body)["port"].s();
         std::cout << ip << std::endl;
-        add_peer(ip);
+        add_peer(ip+":"+ port);
         return crow::response("added your IP to peers");
     });
 
@@ -264,7 +227,8 @@ void Tracker::define_routes() {
         }
 
         std::string ip = json_body["ip"].s();
-        this->add_seeder(ip); 
+        std::string port = crow::json::load(req.body)["port"].s();
+        this->add_seeder(ip+":"+port); 
         
         std::string response_message = "added as seeder " + ip;
         return crow::response(200, response_message);
@@ -275,16 +239,18 @@ void Tracker::define_routes() {
     CROW_ROUTE(app, "/unbecome_seeder")
     .methods(crow::HTTPMethod::Post)
     ([this](const crow::request& req) {
-        auto ip = crow::json::load(req.body)["ip"].s();
-        remove_seeder(ip);
+        std::string ip = crow::json::load(req.body)["ip"].s();
+        std::string port = crow::json::load(req.body)["port"].s();
+        remove_seeder(ip+":"+port);
         return crow::response("removed from seeders");
     });
 
     CROW_ROUTE(app, "/unbecome_peer")
     .methods(crow::HTTPMethod::Post)
     ([this](const crow::request& req) {
-        auto ip = crow::json::load(req.body)["ip"].s();
-        remove_peer(ip);
+        std::string ip = crow::json::load(req.body)["ip"].s();
+        std::string port = crow::json::load(req.body)["port"].s();
+        remove_peer(ip+":"+port);
         return crow::response("removed from peers");
     });
 
@@ -298,9 +264,6 @@ void Tracker::define_routes() {
     .methods(crow::HTTPMethod::Get) 
     ([this]() {
         std::stringstream response_body;
-        add_file("example1.txt","path1");
-        add_file("example2.txt","path2");
-        add_file("example3.txt","path3");
         show_available_files(response_body); 
         return crow::response(response_body.str());
     });
@@ -309,61 +272,38 @@ void Tracker::define_routes() {
     .methods(crow::HTTPMethod::Post)
     ([this](const crow::request& req) {
 
-        auto name = crow::json::load(req.body)["name"].s();
+        std::string name = crow::json::load(req.body)["name"].s();
         std::cout <<  "from Crow " + req.body << std::endl;
+        std::cout <<  "from Crow name" + name << std::endl;
         peer_choosed_file(name);
         return crow::response("file chosen");
     });
 
-    // app.bindaddr("127.0.0.1").port(8080).multithreaded().run();
+    
 }
 
 
 
-// void Tracker::start_accept() {
-//     acceptor.async_accept(
-//         [this](boost::system::error_code ec, tcp::socket socket) {
-//             if (!ec) {
-//                 std::cout << "Accepted connection from: " << socket.remote_endpoint().address().to_string() << std::endl;
-                
-                
-//                 beast::flat_buffer buffer;
-//                 http::request<http::string_body> req;
-//                 http::read(socket, buffer, req);
 
-                
-//                 handle_request(std::move(req), socket);
-//             } else {
-//                 std::cerr << "Accept error: " << ec.message() << std::endl;
-//             }
-//             start_accept(); 
-//         }
-//     );
-// }
+void Tracker::create_example_file(const std::string& filename, std::size_t size_bytes) {
+    std::ofstream file(filename, std::ios::binary);
+    if (!file.is_open()) {
+        std::cerr << "Failed to create file: " << filename << std::endl;
+        return;
+    }
 
-// void Tracker::handle_request(http::request<http::string_body> req, tcp::socket& socket) {
-    
-//     http::response<http::string_body> res{http::status::ok, req.version()};
-//     res.set(http::field::server, "Tracker Server");
-//     res.set(http::field::content_type, "text/plain");
+    std::vector<char> buffer(size_bytes, 'A');
 
-//     if (req.method() == http::verb::get && req.target() == "/list_seeders") {
-//         std::stringstream body;
-//         body << "Seeders:\n";
-//         for (const auto& seeder : seeder_ips) {
-//             body << "- " << seeder << "\n";
-//         }
-//         res.body() = body.str();
-//     } else {
-//         res.body() = "Invalid request.";
-//     }
+    file.write(buffer.data(), size_bytes);
+    if (!file) {
+        std::cerr << "Failed to write to file: " << filename << std::endl;
+    }
 
-//     res.prepare_payload();
-//     http::write(socket, res);
+    file.close();
+    if (!file.good()) {
+        std::cerr << "Error occurred while closing the file: " << filename << std::endl;
+    }
 
-//     beast::error_code ec;
-//     socket.shutdown(tcp::socket::shutdown_both, ec);
-//     if (ec && ec != beast::errc::not_connected) {
-//         std::cerr << "Shutdown error: " << ec.message() << std::endl;
-//     }
-// }
+    add_file(filename, "./" + filename);
+    std::cout << "Created file: " << filename << " with size: " << size_bytes << " bytes" << std::endl;
+}
