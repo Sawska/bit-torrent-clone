@@ -51,6 +51,7 @@ public:
     int choose_file(int first, int last);
     void compose_file(const std::string& output_file);
     bool check_if_part_sended_is_right(const std::vector<char> &part, int index);
+    void initialize_file_parts();
     TorrentFile deserialize_torrent_file(const std::string& json_str);
 
 private:

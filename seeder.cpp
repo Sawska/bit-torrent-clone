@@ -21,55 +21,67 @@ Peer_Seeder::~Peer_Seeder()
 
 
 void Peer_Seeder::ask_for_file() {
-    std::cout << "here7" << std::endl;
     ask_for_seeders();
-    while (file_parts.size() < torrent_file.hashed_pieces.size()) {
-        int index = check_what_part_needed();
-        std::string index_str = std::to_string(index);
-        bool part_received = false;
 
-        for (const auto& seeder_ip : seeder_ips) {
-            auto res_s = split(seeder_ip, ":");
-            connect_to_tracker(res_s[0], std::stoi(res_s[1]));
-            std::string target = "/send_file";
-            httplib::Result res = send_request_Pos(target, index_str);
-
-            if (res && res->status == 200) {
-                std::string body = res->body;
-
-            
-                if (body.empty()) {
-                    std::cerr << "Seeder " << seeder_ip << " does not have the requested part." << std::endl;
-                    continue;
-                }
-
-                std::vector<char> part(body.begin(), body.end());
-
-                if (check_if_part_sended_is_right(part, index)) {
-                     std::string str(part.begin(), part.end());
-                    file_parts.push_back(str);
-                    part_received = true;
-                    break;
-                } else {
-                    std::cerr << "Received file part from " << seeder_ip << " is incorrect." << std::endl;
-                }
-            } else {
-                std::cerr << "Failed to receive file part from " << seeder_ip << std::endl;
-            }
-        }
-
-        if (!part_received) {
-            std::cerr << "Failed to receive the part from any seeder." << std::endl;
-            break;
-        }
+    if (seeder_ips.empty()) {
+        std::cerr << "No seeders available." << std::endl;
+        return;
     }
 
-    if (file_parts.size() == torrent_file.hashed_pieces.size()) {
+    initialize_file_parts(); // Initialize file_parts to the correct size
+
+    auto first_seeder_ip = seeder_ips[0];
+    auto res_s = split(first_seeder_ip, ":");
+
+    if (res_s.size() != 2) {
+        std::cerr << "Invalid seeder IP format: " << first_seeder_ip << std::endl;
+        return;
+    }
+
+    connect_to_tracker(res_s[0], std::stoi(res_s[1]));
+
+    while (true) {
+        int index = check_what_part_needed();
+
+        if (index == -1) {
+            std::cerr << "All parts are already received." << std::endl;
+            break;
+        }
+
+        nlohmann::json request_body;
+        request_body["index"] = index;
+
+        std::string target = "/send_file";
+        httplib::Result res = send_request_Pos(target, request_body);
+
+        if (res && res->status == 200) {
+            std::string body = res->body;
+
+            if (body.empty()) {
+                std::cerr << "Seeder " << first_seeder_ip << " does not have the requested part." << std::endl;
+                continue;
+            }
+
+            std::vector<char> part(body.begin(), body.end());
+
+            std::string str(part.begin(), part.end());
+            file_parts[index] = str; // Store part in the correct index
+            std::cout << "Received part " << index << " from " << first_seeder_ip << std::endl;
+        } else {
+            std::cerr << "Failed to receive file part from " << first_seeder_ip << std::endl;
+        }
+
+        std::this_thread::sleep_for(std::chrono::seconds(1)); // Add a delay before the next request
+    }
+
+    if (file_parts.size() == torrent_file.hashed_pieces.size() &&
+        std::all_of(file_parts.begin(), file_parts.end(), [](const std::string& part) { return !part.empty(); })) {
         std::cout << "All parts received successfully." << std::endl;
     } else {
         std::cerr << "Failed to receive all parts." << std::endl;
     }
 }
+
 
 
 void Peer_Seeder::ask_for_seeders() {
@@ -113,7 +125,8 @@ void Peer_Seeder::be_seeder(std::string ip,int port) {
     .methods(crow::HTTPMethod::POST)
     ([this](const crow::request& req) {
         try {
-            int index = std::stoi(req.body);
+             auto json_req = nlohmann::json::parse(req.body);
+            int index = json_req.at("index").get<int>();
 
             if (!check_if_part_available(index)) {
                 return crow::response(404, "Part not available");
@@ -125,7 +138,7 @@ void Peer_Seeder::be_seeder(std::string ip,int port) {
             return crow::response(400, "Invalid request");
         }
     });
-    app.bindaddr(ip).port(port).multithreaded().run();
+
 }
 
 
@@ -264,6 +277,11 @@ int Peer_Seeder::check_what_part_needed() {
         }
     }
     return -1;
+}
+
+void Peer_Seeder::initialize_file_parts() {
+    
+    file_parts.resize(torrent_file.hashed_pieces.size(), "");
 }
 
 bool Peer_Seeder::check_if_part_available(int index) {

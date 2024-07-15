@@ -13,11 +13,13 @@ void run_tracker(Tracker& tracker) {
 }
 
 void run_seeder(Peer_Seeder& seeder) {
+    seeder.file_parts.resize(4, ""); 
     seeder.file_parts[0] = "AAAAA";
     seeder.file_parts[1] = "AAAAA";
     seeder.file_parts[2] = "AAAAA";
     seeder.file_parts[3] = "AAAAA";
     seeder.be_seeder("127.0.0.1", 8081);
+    seeder.app.bindaddr(seeder.ip).port(seeder.port).multithreaded().run();
 }
 
 int main() {
@@ -25,7 +27,6 @@ int main() {
         Tracker tracker;
         std::thread tracker_thread(run_tracker, std::ref(tracker));
 
-        
         std::this_thread::sleep_for(std::chrono::seconds(2));
 
         Peer_Seeder peer_seeder("127.0.0.1", 8081);
@@ -39,16 +40,15 @@ int main() {
         std::cout << "Torrent file name: " << peer_seeder.torrent_file.name << std::endl;
 
         std::this_thread::sleep_for(std::chrono::seconds(1));
-
-        std::thread seeder_thread(run_seeder, std::ref(peer_seeder));
         Peer_Seeder peer_seeder1("127.0.0.1", 8082);
         peer_seeder1.connect_to_tracker("127.0.0.1", 8080);
         peer_seeder1.main_exchange();
         peer_seeder1.ask_for_torrent_file();
 
-        
         std::this_thread::sleep_for(std::chrono::seconds(1));
 
+        std::thread seeder_thread(run_seeder, std::ref(peer_seeder));
+        peer_seeder1.initialize_file_parts();
         peer_seeder1.ask_for_file();
         peer_seeder1.compose_file("new_example.txt");
 
